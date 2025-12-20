@@ -1,0 +1,6 @@
+# 開発用依存関係
+# 通常の依存関係に加えて、exeビルド用のツールを含む
+
+-r requirements.txt
+pyinstaller>=6.0.0
+
