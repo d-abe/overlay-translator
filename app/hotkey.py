@@ -38,17 +38,23 @@ class HotkeyManager:
     
     def start_listening(self):
         """ホットキーの監視を開始"""
+        import os
+        from app.logger import debug
+        debug(f"ホットキー監視を開始します (PID: {os.getpid()})")
         self.listening = True
         try:
             self.current_hotkey_id = keyboard.add_hotkey(self.hotkey, self._on_hotkey_pressed)
+            debug(f"ホットキーを登録しました: {self.hotkey}")
         except Exception as e:
             error(f"ホットキーの登録に失敗しました: {e}")
             warning(f"使用しようとしたホットキー: {self.hotkey}")
             warning("デフォルトのホットキー（ctrl+shift+t）を使用します")
             self.hotkey = 'ctrl+shift+t'
             self.current_hotkey_id = keyboard.add_hotkey(self.hotkey, self._on_hotkey_pressed)
+            debug(f"デフォルトホットキーを登録しました: {self.hotkey}")
         
         # 監視ループ
+        debug("ホットキー監視ループを開始します")
         while self.listening:
             time.sleep(0.1)
     

@@ -9,7 +9,7 @@ from app.capture import ScreenCapture
 from app.ocr import OCRProcessor
 from app.translator import Translator
 from app.overlay import OverlayWindow
-from app.settings_window import SettingsWindow
+from app.settings_window_flet import SettingsWindowFlet as SettingsWindow
 from app.logger import debug, info, warning, error, exception
 
 class OverlayTranslator:
@@ -91,16 +91,21 @@ class OverlayTranslator:
     
     def start(self):
         """アプリケーションを起動"""
+        import os
+        debug(f"アプリケーションを起動します (PID: {os.getpid()})")
+        
         # ホットキー登録
         self.hotkey_manager.register_hotkey(
             callback=self.on_selection_complete
         )
         
         # タスクトレイ起動
+        debug("タスクトレイアイコンを作成します...")
         self.tray_app = TrayApp(
             on_quit=self.stop,
             on_settings=self.show_settings
         )
+        debug("タスクトレイアイコンを作成しました")
         
         # ホットキー監視を別スレッドで開始
         hotkey_thread = threading.Thread(
@@ -108,8 +113,10 @@ class OverlayTranslator:
             daemon=True
         )
         hotkey_thread.start()
+        debug("ホットキー監視スレッドを開始しました")
         
         # タスクトレイをメインスレッドで実行
+        debug("タスクトレイアイコンを実行します...")
         self.tray_app.run()
     
     def stop(self):
@@ -119,10 +126,12 @@ class OverlayTranslator:
             if self.overlay:
                 self.overlay.close()
             if self.settings_window:
+                debug("設定ウィンドウを閉じます...")
                 self.settings_window.close()
             self.hotkey_manager.stop()
         except Exception as e:
             error(f"クリーンアップエラー: {e}")
+            exception("クリーンアップエラー", exc_info=True)
         finally:
             # アプリケーションを終了
             import os
@@ -130,26 +139,21 @@ class OverlayTranslator:
     
     def show_settings(self):
         """設定画面を表示"""
-        # 既存の設定画面が開いている場合は前面に表示
-        if self.settings_window and self.settings_window.root:
-            try:
-                # ウィンドウがまだ存在するか確認
-                self.settings_window.root.winfo_exists()
-                self.settings_window.root.lift()
-                self.settings_window.root.focus_force()
-                self.settings_window.root.attributes('-topmost', True)
-                self.settings_window.root.after(100, lambda: self.settings_window.root.attributes('-topmost', False))
+        # 既存の設定画面が開いている場合はスキップ（SettingsWindowFletは別プロセスで実行されるため）
+        if self.settings_window:
+            # プロセスが実行中かどうかを確認
+            if self.settings_window._process and self.settings_window._process.poll() is None:
+                # 既に開いているのでスキップ
                 return
-            except:
-                # ウィンドウが既に閉じられている場合は参照をクリア
+            else:
+                # プロセスが終了しているので参照をクリア
                 self.settings_window = None
         
-        # 設定画面を別スレッドで開く（Tkinterは別スレッドでも動作する）
+        # 設定画面を別スレッドで開く（Fletは別プロセスで実行される）
         def open_settings():
             self.settings_window = SettingsWindow(on_save_callback=self._on_settings_saved)
             self.settings_window.show()
-            # ウィンドウが閉じられた後、参照をクリア
-            self.settings_window = None
+            # 注意: ウィンドウが閉じられた後も参照を保持（stop()で閉じるため）
         
         settings_thread = threading.Thread(target=open_settings, daemon=True)
         settings_thread.start()
@@ -173,6 +177,15 @@ class OverlayTranslator:
         self.settings_window = None
 
 if __name__ == "__main__":
+    # コマンドライン引数をチェック
+    if len(sys.argv) > 1:
+        # 設定ウィンドウモードで実行
+        if 'settings_window_flet.py' in sys.argv[1] or '--settings' in sys.argv:
+            from app.settings_window_flet import run_flet_settings_window
+            run_flet_settings_window()
+            sys.exit(0)
+    
+    # 通常のメインアプリケーションとして実行
     app = OverlayTranslator()
     app.start()
 

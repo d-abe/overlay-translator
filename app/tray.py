@@ -43,6 +43,10 @@ class TrayApp:
     
     def _create_icon(self):
         """タスクトレイアイコンを作成"""
+        import os
+        from app.logger import debug
+        debug(f"タスクトレイアイコンを作成中 (PID: {os.getpid()})")
+        
         # icon.pngファイルを読み込む
         icon_path = self._get_icon_path()
         
@@ -61,21 +65,26 @@ class TrayApp:
                 # RGBAモードに変換（透明度をサポート）
                 if image.mode != 'RGBA':
                     image = image.convert('RGBA')
+                debug(f"アイコン画像を読み込みました: {icon_path}")
             except Exception as e:
                 warning(f"icon.pngの読み込みに失敗しました: {e}")
                 # フォールバック: デフォルトアイコンを生成
                 image = self._create_default_icon()
+                debug("デフォルトアイコンを生成しました")
         else:
             warning(f"icon.pngが見つかりません: {icon_path}")
             # フォールバック: デフォルトアイコンを生成
             image = self._create_default_icon()
+            debug("デフォルトアイコンを生成しました")
         
         menu = pystray.Menu(
             pystray.MenuItem("設定", self._on_settings, default=True),
             pystray.MenuItem("終了", self._on_quit)
         )
         
+        debug("pystray.Iconを作成します...")
         self.icon = pystray.Icon("OverlayTranslator", image, "Overlay Translator", menu)
+        debug("pystray.Iconを作成しました")
     
     def _create_default_icon(self):
         """デフォルトアイコンを生成（フォールバック用）"""
@@ -105,5 +114,8 @@ class TrayApp:
     
     def run(self):
         """タスクトレイを実行"""
+        import os
+        from app.logger import debug
+        debug(f"タスクトレイアイコンを実行します (PID: {os.getpid()})")
         self.icon.run()
 
