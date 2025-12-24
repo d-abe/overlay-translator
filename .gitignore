@@ -48,3 +48,32 @@ build/
 *.log
 
 **/_pycache_/
+
+# WinUI 3 / .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.csproj.user
+*.csproj.vspscc
+*.slnx.bak
+.vs/
+*.vsidx
+*.vspscc
+*.vspx
+*.sdf
+*.opensdf
+*.db-shm
+*.db-wal
+*.db
+appsettings.json
+*.pdb
+*.cache
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "OverlayTranslator (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "OverlayTranslator (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

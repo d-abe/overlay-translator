@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Window
+    x:Class="OverlayTranslator.Views.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <!-- Groq API設定セクション -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumLowBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Groq API設定（翻訳用）" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="APIキー:"/>
+                        <PasswordBox x:Name="GroqApiKeyBox" 
+                                    PlaceholderText="Groq APIキーを入力"/>
+                    </StackPanel>
+                    
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="モデル:"/>
+                        <ComboBox x:Name="GroqModelComboBox" 
+                                  PlaceholderText="モデルを選択">
+                            <ComboBoxItem Content="llama-3.1-8b-instant（高速・低コスト・推奨）" IsSelected="True"/>
+                            <ComboBoxItem Content="llama-3.3-70b-versatile（高品質）"/>
+                            <ComboBoxItem Content="openai/gpt-oss-120b（最高品質）"/>
+                            <ComboBoxItem Content="openai/gpt-oss-20b（高速）"/>
+                            <ComboBoxItem Content="meta-llama/llama-4-maverick-17b-128e-instruct（Preview）"/>
+                            <ComboBoxItem Content="meta-llama/llama-4-scout-17b-16e-instruct（Preview）"/>
+                            <ComboBoxItem Content="qwen/qwen3-32b（Preview）"/>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Groq Vision API設定セクション -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumLowBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Groq Vision API設定（OCR用）" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Visionモデル:"/>
+                        <ComboBox x:Name="GroqVisionModelComboBox" 
+                                  PlaceholderText="Visionモデルを選択">
+                            <ComboBoxItem Content="meta-llama/llama-4-scout-17b-16e-instruct（高速）" IsSelected="True"/>
+                            <ComboBoxItem Content="meta-llama/llama-4-maverick-17b-128e-instruct（高品質）"/>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ホットキー設定セクション -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumLowBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="ホットキー設定" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <TextBox x:Name="HotkeyTextBox" 
+                             PlaceholderText="例: Ctrl+Shift+T"/>
+                </StackPanel>
+            </Border>
+
+            <!-- オーバーレイフォント設定セクション -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumLowBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="オーバーレイフォント設定" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <TextBox x:Name="FontDisplayTextBox" 
+                                 Grid.Column="0"
+                                 IsReadOnly="True"
+                                 PlaceholderText="フォントを選択してください"
+                                 VerticalAlignment="Center"
+                                 HorizontalAlignment="Stretch"/>
+                        <Button x:Name="SelectFontButton" 
+                                Grid.Column="1"
+                                Content="フォントを選択..."
+                                Click="OnSelectFontClick"
+                                MinWidth="120"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- デバッグ設定セクション -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumLowBrush}" 
+                    BorderThickness="1" 
+                    CornerRadius="4" 
+                    Padding="15">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="デバッグ設定" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <CheckBox x:Name="DebugLoggingCheckBox" 
+                              Content="DEBUGログを有効にする"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ボタン -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Right" 
+                        Spacing="10" 
+                        Margin="0,10,0,0">
+                <Button x:Name="CancelButton" 
+                        Content="キャンセル" 
+                        Click="OnCancelClick"/>
+                <Button x:Name="SaveButton" 
+                        Content="保存" 
+                        Click="OnSaveClick" 
+                        Style="{ThemeResource AccentButtonStyle}"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
+
