@@ -359,33 +359,87 @@ namespace OverlayTranslator
                             return;
                         }
 
-                        Logger.Info("OCR処理を開始します");
-                        var extractedText = await _ocrService.ExtractTextAsync(bitmap);
-                        Logger.Info($"OCR処理成功: 抽出テキスト=\"{extractedText}\"");
+                        string finalText;
 
-                        if (string.IsNullOrWhiteSpace(extractedText))
+                        // 設定に応じてOCR処理を切り替え
+                        if (_settings.UseCombinedOCRTranslation)
                         {
-                            Logger.Warning("OCRでテキストが抽出されませんでした");
-                            return;
-                        }
+                            // OCR+翻訳処理（同時実行モード）
+                            Logger.Info("OCR+翻訳処理を開始します（同時実行モード）");
+                            var ocrResult = await _ocrService.ExtractAndTranslateAsync(bitmap);
+                            
+                            if (!ocrResult.Success)
+                            {
+                                Logger.Error($"OCR+翻訳処理失敗: {ocrResult.ErrorMessage}");
+                                return;
+                            }
 
-                        // 3. 翻訳処理
-                        if (_translationService == null)
+                            Logger.Info($"OCR処理成功: 元テキスト=\"{ocrResult.English}\", 翻訳テキスト=\"{ocrResult.Japanese}\"");
+
+                            finalText = ocrResult.Japanese;
+
+                            // 翻訳が失敗した場合（japaneseが空の場合）、別のモデルで再翻訳を試みる
+                            if (string.IsNullOrWhiteSpace(ocrResult.Japanese) && !string.IsNullOrWhiteSpace(ocrResult.English))
+                            {
+                                Logger.Warning("OCR+翻訳モードで翻訳が取得できませんでした。TranslationServiceで再翻訳を試みます。");
+                                
+                                // 3. 翻訳処理（フォールバック）
+                                if (_translationService == null)
+                                {
+                                    Logger.Warning("TranslationServiceが初期化されていません（APIキーが設定されていない可能性があります）");
+                                    return;
+                                }
+
+                                Logger.Info("翻訳処理を開始します（フォールバック）");
+                                var translationResult = await _translationService.TranslateToJapaneseAsync(ocrResult.English);
+
+                                if (!translationResult.Success)
+                                {
+                                    Logger.Error($"翻訳処理失敗: {translationResult.ErrorMessage}");
+                                    return;
+                                }
+
+                                Logger.Info($"翻訳処理成功: 翻訳テキスト=\"{translationResult.TranslatedText}\"");
+                                finalText = translationResult.TranslatedText;
+                            }
+                            else if (string.IsNullOrWhiteSpace(ocrResult.English) && string.IsNullOrWhiteSpace(ocrResult.Japanese))
+                            {
+                                Logger.Warning("OCRでテキストが抽出されませんでした");
+                                return;
+                            }
+                        }
+                        else
                         {
-                            Logger.Warning("TranslationServiceが初期化されていません（APIキーが設定されていない可能性があります）");
-                            return;
+                            // 通常モード: OCRと翻訳を別々に実行
+                            Logger.Info("OCR処理を開始します（通常モード）");
+                            var extractedText = await _ocrService.ExtractTextAsync(bitmap);
+                            Logger.Info($"OCR処理成功: 抽出テキスト=\"{extractedText}\"");
+
+                            if (string.IsNullOrWhiteSpace(extractedText))
+                            {
+                                Logger.Warning("OCRでテキストが抽出されませんでした");
+                                return;
+                            }
+
+                            // 3. 翻訳処理
+                            if (_translationService == null)
+                            {
+                                Logger.Warning("TranslationServiceが初期化されていません（APIキーが設定されていない可能性があります）");
+                                return;
+                            }
+
+                            Logger.Info("翻訳処理を開始します");
+                            var translationResult = await _translationService.TranslateToJapaneseAsync(extractedText);
+
+                            if (!translationResult.Success)
+                            {
+                                Logger.Error($"翻訳処理失敗: {translationResult.ErrorMessage}");
+                                return;
+                            }
+
+                            Logger.Info($"翻訳処理成功: 翻訳テキスト=\"{translationResult.TranslatedText}\"");
+                            finalText = translationResult.TranslatedText;
                         }
-
-                        Logger.Info("翻訳処理を開始します");
-                        var translationResult = await _translationService.TranslateToJapaneseAsync(extractedText);
-
-                        if (!translationResult.Success)
-                        {
-                            Logger.Error($"翻訳処理失敗: {translationResult.ErrorMessage}");
-                            return;
-                        }
-
-                        Logger.Info($"翻訳処理成功: 翻訳テキスト=\"{translationResult.TranslatedText}\"");
 
                         // 4. オーバーレイ表示
                         if (_overlayService == null)
@@ -404,7 +458,7 @@ namespace OverlayTranslator
                             y,
                             width,
                             height,
-                            translationResult.TranslatedText,
+                            finalText, // 翻訳済みテキストを直接使用
                             dominantColor,
                             _settings
                         );

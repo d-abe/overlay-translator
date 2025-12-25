@@ -70,7 +70,7 @@ namespace OverlayTranslator.Views
             
             // ウィンドウのタイトルとサイズを設定
             this.AppWindow.Title = "設定 - Overlay Translator";
-            this.AppWindow.Resize(new Windows.Graphics.SizeInt32(650, 985));
+            this.AppWindow.Resize(new Windows.Graphics.SizeInt32(650, 1045));
             this.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
             
             // タイトルバーの色を設定（ダークモード/ライトモードに合わせる）
@@ -124,7 +124,7 @@ namespace OverlayTranslator.Views
             if (displayArea != null)
             {
                 var centerX = (displayArea.WorkArea.Width - 650) / 2;
-                var centerY = (displayArea.WorkArea.Height - 985) / 2;
+                var centerY = (displayArea.WorkArea.Height - 1045) / 2;
                 this.AppWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
             }
             
@@ -205,6 +205,7 @@ namespace OverlayTranslator.Views
             _selectedFontStyle = settings.OverlayFontStyle ?? "normal";
             UpdateFontDisplay(_selectedFontFamily, _selectedFontSize, _selectedFontStyle);
             
+            UseCombinedOCRTranslationCheckBox.IsChecked = settings.UseCombinedOCRTranslation;
             DebugLoggingCheckBox.IsChecked = settings.DebugLogging;
         }
 
@@ -222,6 +223,7 @@ namespace OverlayTranslator.Views
                 OverlayFontFamily = _selectedFontFamily,
                 OverlayFontSize = _selectedFontSize,
                 OverlayFontStyle = _selectedFontStyle,
+                UseCombinedOCRTranslation = UseCombinedOCRTranslationCheckBox.IsChecked ?? true,
                 DebugLogging = DebugLoggingCheckBox.IsChecked ?? false
             };
         }

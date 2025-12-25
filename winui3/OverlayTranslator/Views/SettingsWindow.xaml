@@ -55,6 +55,10 @@
                             <ComboBoxItem Content="meta-llama/llama-4-maverick-17b-128e-instruct（高品質）"/>
                         </ComboBox>
                     </StackPanel>
+                    
+                    <CheckBox x:Name="UseCombinedOCRTranslationCheckBox" 
+                              Content="OCRと翻訳を同時に実行する（リクエスト数を削減）"
+                              ToolTipService.ToolTip="有効にすると、OCR処理時に同時に翻訳も実行します。リクエスト数が減り、処理速度も向上します。"/>
                 </StackPanel>
             </Border>
 

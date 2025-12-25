@@ -14,6 +14,7 @@ namespace OverlayTranslator.Models
         public string OverlayFontFamily { get; set; } = "Meiryo";
         public int OverlayFontSize { get; set; } = 12;
         public string OverlayFontStyle { get; set; } = "normal";
+        public bool UseCombinedOCRTranslation { get; set; } = true; // OCRと翻訳を同時に実行するか
         public bool DebugLogging { get; set; } = false;
     }
 }
