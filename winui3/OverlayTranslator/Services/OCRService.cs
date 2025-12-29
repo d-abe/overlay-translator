@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using OverlayTranslator.Models;
 using OverlayTranslator.Utils;
@@ -20,6 +21,10 @@ namespace OverlayTranslator.Services
         private readonly string _visionModel;
         private const int MaxRetries = 3;
         private const int TimeoutSeconds = 30;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
+        };
 
         public OCRService(string apiKey, string visionModel = "meta-llama/llama-4-scout-17b-16e-instruct")
         {
@@ -79,7 +84,7 @@ namespace OverlayTranslator.Services
                         max_tokens = 2048
                     };
 
-                    var json = JsonSerializer.Serialize(requestBody);
+                    var json = JsonSerializer.Serialize(requestBody, JsonOptions);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                     var response = await _httpClient.PostAsync(
@@ -95,7 +100,7 @@ namespace OverlayTranslator.Services
                     }
 
                     var responseJson = await response.Content.ReadAsStringAsync();
-                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson, JsonOptions);
 
                     var text = responseObj.GetProperty("choices")[0]
                         .GetProperty("message")
@@ -113,7 +118,7 @@ namespace OverlayTranslator.Services
                     try
                     {
                         // レスポンスがJSON形式かどうかを確認
-                        var jsonElement = JsonSerializer.Deserialize<JsonElement>(jsonText);
+                        var jsonElement = JsonSerializer.Deserialize<JsonElement>(jsonText, JsonOptions);
                         var english = jsonElement.TryGetProperty("english", out var englishProp) 
                             ? englishProp.GetString() ?? string.Empty 
                             : string.Empty;
@@ -131,14 +136,29 @@ namespace OverlayTranslator.Services
                     }
                     catch (JsonException ex)
                     {
-                        // JSON形式でない場合、レスポンス全体を翻訳テキストとして扱う（後方互換性）
-                        Logger.Warning($"JSON形式のパースに失敗しました。レスポンス全体を翻訳テキストとして扱います: {ex.Message}");
-                        return new OCRResult
+                        // JSONパースに失敗した場合、破損したJSONからでも japanese フィールドを抽出を試みる
+                        Logger.Warning($"JSON形式のパースに失敗しました。破損したJSONから japanese フィールドを抽出を試みます: {ex.Message}");
+                        
+                        // 正規表現で "japanese" フィールドを抽出
+                        var japaneseMatch = ExtractJapaneseFromBrokenJson(jsonText);
+                        if (japaneseMatch != null)
                         {
-                            English = string.Empty,
-                            Japanese = extractedText,
-                            Success = true
-                        };
+                            // japanese フィールドが見つかった場合
+                            var englishMatch = ExtractEnglishFromBrokenJson(jsonText);
+                            Logger.Info($"破損したJSONから抽出成功: 元テキスト長={englishMatch?.Length ?? 0}, 翻訳テキスト長={japaneseMatch.Length}");
+                            return new OCRResult
+                            {
+                                English = englishMatch ?? string.Empty,
+                                Japanese = japaneseMatch,
+                                Success = true
+                            };
+                        }
+                        else
+                        {
+                            // japanese フィールドが見つからない場合、リトライを試みる
+                            Logger.Warning("破損したJSONから japanese フィールドを抽出できませんでした。リトライを試みます。");
+                            throw; // 例外を再スローしてリトライ処理に委ねる
+                        }
                     }
                 }
                 catch (TaskCanceledException ex)
@@ -240,6 +260,95 @@ namespace OverlayTranslator.Services
         }
 
         /// <summary>
+        /// 破損したJSONから "japanese" フィールドの値を抽出
+        /// </summary>
+        private string? ExtractJapaneseFromBrokenJson(string jsonText)
+        {
+            try
+            {
+                // "japanese": "..." のパターンを検索
+                // 最後の " が存在しない場合（JSONが破損している場合）にも対応
+                // パターン1: 通常の形式 "japanese": "..."
+                var pattern1 = @"""japanese""\s*:\s*""((?:[^""\\]|\\.)*)""";
+                var match1 = Regex.Match(jsonText, pattern1, RegexOptions.IgnoreCase);
+                
+                if (match1.Success && match1.Groups.Count > 1)
+                {
+                    var japaneseValue = match1.Groups[1].Value;
+                    // エスケープシーケンスを解除
+                    japaneseValue = japaneseValue.Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t");
+                    Logger.Debug($"破損したJSONから japanese フィールドを抽出しました（通常形式）: 長さ={japaneseValue.Length}");
+                    return japaneseValue;
+                }
+                
+                // パターン2: 最後の " が存在しない形式 "japanese": "...（終端まで）
+                var pattern2 = @"""japanese""\s*:\s*""((?:[^""\\]|\\.)*?)(?:""|$|\s*[,}])";
+                var match2 = Regex.Match(jsonText, pattern2, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                
+                if (match2.Success && match2.Groups.Count > 1)
+                {
+                    var japaneseValue = match2.Groups[1].Value;
+                    // エスケープシーケンスを解除
+                    japaneseValue = japaneseValue.Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t");
+                    Logger.Debug($"破損したJSONから japanese フィールドを抽出しました（破損形式）: 長さ={japaneseValue.Length}");
+                    return japaneseValue;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"japanese フィールドの抽出エラー: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 破損したJSONから "english" フィールドの値を抽出
+        /// </summary>
+        private string? ExtractEnglishFromBrokenJson(string jsonText)
+        {
+            try
+            {
+                // "english": "..." のパターンを検索
+                // 最後の " が存在しない場合（JSONが破損している場合）にも対応
+                // パターン1: 通常の形式 "english": "..."
+                var pattern1 = @"""english""\s*:\s*""((?:[^""\\]|\\.)*)""";
+                var match1 = Regex.Match(jsonText, pattern1, RegexOptions.IgnoreCase);
+                
+                if (match1.Success && match1.Groups.Count > 1)
+                {
+                    var englishValue = match1.Groups[1].Value;
+                    // エスケープシーケンスを解除
+                    englishValue = englishValue.Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t");
+                    Logger.Debug($"破損したJSONから english フィールドを抽出しました（通常形式）: 長さ={englishValue.Length}");
+                    return englishValue;
+                }
+                
+                // パターン2: 最後の " が存在しない形式 "english": "...（終端まで）
+                // "english": " の後に続く文字列を、次の " または行末まで抽出
+                var pattern2 = @"""english""\s*:\s*""((?:[^""\\]|\\.)*?)(?:""|$)";
+                var match2 = Regex.Match(jsonText, pattern2, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                
+                if (match2.Success && match2.Groups.Count > 1)
+                {
+                    var englishValue = match2.Groups[1].Value;
+                    // エスケープシーケンスを解除
+                    englishValue = englishValue.Replace("\\\"", "\"").Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t");
+                    Logger.Debug($"破損したJSONから english フィールドを抽出しました（破損形式）: 長さ={englishValue.Length}");
+                    return englishValue;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"english フィールドの抽出エラー: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// 画像からテキストを抽出（Groq Vision API）
         /// </summary>
         public async Task<string> ExtractTextAsync(SoftwareBitmap bitmap)
@@ -290,7 +399,7 @@ namespace OverlayTranslator.Services
                         max_tokens = 2048
                     };
 
-                    var json = JsonSerializer.Serialize(requestBody);
+                    var json = JsonSerializer.Serialize(requestBody, JsonOptions);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                     var response = await _httpClient.PostAsync(
@@ -306,7 +415,7 @@ namespace OverlayTranslator.Services
                     }
 
                     var responseJson = await response.Content.ReadAsStringAsync();
-                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson, JsonOptions);
 
                     var text = responseObj.GetProperty("choices")[0]
                         .GetProperty("message")

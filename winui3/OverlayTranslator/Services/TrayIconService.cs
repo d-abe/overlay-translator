@@ -92,13 +92,15 @@ namespace OverlayTranslator.Services
         public const uint TPM_RETURNCMD = 0x0100;
 
         private const int MENU_ID_SETTINGS = 1;
-        private const int MENU_ID_QUIT = 2;
+        private const int MENU_ID_ABOUT = 2;
+        private const int MENU_ID_QUIT = 3;
 
         private IntPtr _windowHandle;
         private int _iconId = 1;
         private IntPtr _iconHandle = IntPtr.Zero;
 
         public event EventHandler? SettingsClicked;
+        public event EventHandler? AboutClicked;
         public event EventHandler? QuitClicked;
 
         public TrayIconService(IntPtr windowHandle)
@@ -262,6 +264,7 @@ namespace OverlayTranslator.Services
                 }
 
                 AppendMenu(hMenu, MF_STRING, MENU_ID_SETTINGS, "設定");
+                AppendMenu(hMenu, MF_STRING, MENU_ID_ABOUT, "バージョン情報");
                 AppendMenu(hMenu, MF_SEPARATOR, 0, string.Empty);
                 AppendMenu(hMenu, MF_STRING, MENU_ID_QUIT, "終了");
 
@@ -277,6 +280,9 @@ namespace OverlayTranslator.Services
                 {
                     case MENU_ID_SETTINGS:
                         SettingsClicked?.Invoke(this, EventArgs.Empty);
+                        break;
+                    case MENU_ID_ABOUT:
+                        AboutClicked?.Invoke(this, EventArgs.Empty);
                         break;
                     case MENU_ID_QUIT:
                         QuitClicked?.Invoke(this, EventArgs.Empty);

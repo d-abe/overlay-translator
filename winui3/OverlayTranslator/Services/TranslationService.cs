@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using OverlayTranslator.Models;
 using OverlayTranslator.Utils;
 
@@ -15,6 +16,10 @@ namespace OverlayTranslator.Services
         private readonly string _model;
         private const int MaxRetries = 3;
         private const int TimeoutSeconds = 30;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver()
+        };
 
         public TranslationService(string apiKey, string model = "llama-3.1-8b-instant")
         {
@@ -70,7 +75,7 @@ namespace OverlayTranslator.Services
                         max_tokens = 1000
                     };
 
-                    var json = JsonSerializer.Serialize(requestBody);
+                    var json = JsonSerializer.Serialize(requestBody, JsonOptions);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                     var response = await _httpClient.PostAsync(
@@ -86,7 +91,7 @@ namespace OverlayTranslator.Services
                     }
 
                     var responseJson = await response.Content.ReadAsStringAsync();
-                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                    var responseObj = JsonSerializer.Deserialize<JsonElement>(responseJson, JsonOptions);
 
                     var translatedText = responseObj.GetProperty("choices")[0]
                         .GetProperty("message")

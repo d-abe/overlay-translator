@@ -10,6 +10,7 @@ using System.IO;
 using System;
 using Microsoft.UI.Xaml.Controls;
 using System.Threading.Tasks;
+using Windows.System;
 
 namespace OverlayTranslator
 {
@@ -29,6 +30,7 @@ namespace OverlayTranslator
         private TranslationService? _translationService;
         private OverlayService? _overlayService;
         private SettingsWindow? _settingsWindow;
+        private Window? _aboutWindow;
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -100,6 +102,7 @@ namespace OverlayTranslator
                         // タスクトレイアイコンサービスを初期化
                         _trayIconService = new TrayIconService(windowHandle);
                         _trayIconService.SettingsClicked += OnSettingsClicked;
+                        _trayIconService.AboutClicked += OnAboutClicked;
                         _trayIconService.QuitClicked += OnQuitClicked;
                         _trayIconService.Show();
 
@@ -196,6 +199,290 @@ namespace OverlayTranslator
         public Settings GetSettings()
         {
             return _settings ?? new Settings();
+        }
+
+        /// <summary>
+        /// バージョン情報ボタンがクリックされたときの処理
+        /// </summary>
+        private async void OnAboutClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                Logger.Info("バージョン情報ボタンがクリックされました");
+                
+                // 既存のバージョン情報ウィンドウが開いている場合は前面に表示
+                if (_aboutWindow != null)
+                {
+                    try
+                    {
+                        // ウィンドウが有効かどうかを確認（AppWindowがnullでないか）
+                        if (_aboutWindow.AppWindow == null)
+                        {
+                            _aboutWindow = null;
+                        }
+                        else
+                        {
+                            // 既に開いているので、前面に表示
+                            _aboutWindow.AppWindow.MoveInZOrderAtTop();
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        // ウィンドウが無効な場合は参照をクリア
+                        _aboutWindow = null;
+                    }
+                }
+                
+                // 一時的なウィンドウを作成してContentDialogを表示
+                var tempWindow = new Window();
+                _aboutWindow = tempWindow;
+                tempWindow.Content = new Microsoft.UI.Xaml.Controls.Grid();
+                tempWindow.AppWindow.Title = "バージョン情報";
+                tempWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(400, 464));
+                
+                // ウィンドウのアイコンを設定
+                await SetAboutWindowIcon(tempWindow);
+                
+                // タイトルバーの色を設定（ダークモード/ライトモードに合わせる）
+                var titleBar = tempWindow.AppWindow.TitleBar;
+                titleBar.ExtendsContentIntoTitleBar = false; // タイトルバーを通常表示
+                
+                // システムのテーマに合わせてタイトルバーの色を設定
+                var uiSettings = new Windows.UI.ViewManagement.UISettings();
+                var systemBackgroundColor = uiSettings.GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
+                
+                // ダークモードかどうかを判定（背景色が暗い場合）
+                bool isDarkMode = systemBackgroundColor.R < 128;
+                
+                if (isDarkMode)
+                {
+                    // ダークモード: タイトルバーを暗く
+                    titleBar.BackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 32, 32, 32);
+                    titleBar.ForegroundColor = Microsoft.UI.Colors.White;
+                    titleBar.InactiveBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 20, 20, 20);
+                    titleBar.InactiveForegroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 200, 200, 200);
+                    titleBar.ButtonBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 32, 32, 32);
+                    titleBar.ButtonForegroundColor = Microsoft.UI.Colors.White;
+                    titleBar.ButtonHoverBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 64, 64, 64);
+                    titleBar.ButtonHoverForegroundColor = Microsoft.UI.Colors.White;
+                    titleBar.ButtonPressedBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 48, 48, 48);
+                    titleBar.ButtonPressedForegroundColor = Microsoft.UI.Colors.White;
+                    titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 20, 20, 20);
+                    titleBar.ButtonInactiveForegroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 150, 150, 150);
+                }
+                else
+                {
+                    // ライトモード: タイトルバーを明るく
+                    titleBar.BackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 243, 243, 243);
+                    titleBar.ForegroundColor = Microsoft.UI.Colors.Black;
+                    titleBar.InactiveBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 243, 243, 243);
+                    titleBar.InactiveForegroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 100, 100, 100);
+                    titleBar.ButtonBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 243, 243, 243);
+                    titleBar.ButtonForegroundColor = Microsoft.UI.Colors.Black;
+                    titleBar.ButtonHoverBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 230, 230, 230);
+                    titleBar.ButtonHoverForegroundColor = Microsoft.UI.Colors.Black;
+                    titleBar.ButtonPressedBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 220, 220, 220);
+                    titleBar.ButtonPressedForegroundColor = Microsoft.UI.Colors.Black;
+                    titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 243, 243, 243);
+                    titleBar.ButtonInactiveForegroundColor = Microsoft.UI.ColorHelper.FromArgb(255, 150, 150, 150);
+                }
+                
+                // ウィンドウサイズ変更を監視してログに出力
+                tempWindow.AppWindow.Changed += (sender, args) =>
+                {
+                    if (args.DidSizeChange)
+                    {
+                        var size = tempWindow.AppWindow.Size;
+                        Logger.Info($"バージョン情報ウィンドウのサイズが変更されました: {size.Width}x{size.Height}");
+                    }
+                };
+                
+                // ウィンドウを中央に配置
+                var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(
+                    new Windows.Graphics.PointInt32(0, 0),
+                    Microsoft.UI.Windowing.DisplayAreaFallback.Nearest);
+                if (displayArea != null)
+                {
+                    var centerX = (displayArea.WorkArea.Width - 400) / 2;
+                    var centerY = (displayArea.WorkArea.Height - 464) / 2;
+                    tempWindow.AppWindow.Move(new Windows.Graphics.PointInt32(centerX, centerY));
+                }
+                
+                var tcs = new TaskCompletionSource<bool>();
+                var dialogShown = false;
+                
+                // ActivatedイベントでContentDialogを表示（一度だけ実行されるようにする）
+                Windows.Foundation.TypedEventHandler<object, Microsoft.UI.Xaml.WindowActivatedEventArgs>? activatedHandler = null;
+                activatedHandler = async (s, e) =>
+                {
+                    // 一度だけ実行されるようにする
+                    if (dialogShown)
+                    {
+                        return;
+                    }
+                    dialogShown = true;
+                    
+                    // イベントハンドラーを解除
+                    tempWindow.Activated -= activatedHandler;
+                    
+                    try
+                    {
+                        // 少し待ってからXamlRootを取得
+                        await Task.Delay(100);
+                        
+                        // XamlRootを取得
+                        var xamlRoot = tempWindow.Content?.XamlRoot;
+                        if (xamlRoot == null)
+                        {
+                            Logger.Warning("XamlRootが取得できませんでした");
+                            tempWindow.Close();
+                            tcs.SetResult(false);
+                            return;
+                        }
+                        
+                        // バージョン情報ダイアログを表示
+                        var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+                        {
+                            Title = string.Empty, // タイトルを削除
+                            Content = await CreateAboutContentAsync(),
+                            CloseButtonText = "閉じる",
+                            XamlRoot = xamlRoot
+                        };
+                        
+                        await dialog.ShowAsync();
+                        
+                        // ダイアログを閉じた後、一時ウィンドウも閉じる
+                        tempWindow.Close();
+                        _aboutWindow = null; // 参照をクリア
+                        tcs.SetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("ContentDialogの表示エラー", ex);
+                        tempWindow.Close();
+                        _aboutWindow = null; // 参照をクリア
+                        tcs.SetResult(false);
+                    }
+                };
+                
+                tempWindow.Activated += activatedHandler;
+                tempWindow.Activate();
+                await tcs.Task;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("バージョン情報ダイアログの表示エラー", ex);
+                _aboutWindow = null; // エラー時も参照をクリア
+            }
+        }
+
+        /// <summary>
+        /// バージョン情報ダイアログのコンテンツを作成
+        /// </summary>
+        private async Task<Microsoft.UI.Xaml.UIElement> CreateAboutContentAsync()
+        {
+            var stackPanel = new Microsoft.UI.Xaml.Controls.StackPanel
+            {
+                Spacing = 15,
+                Margin = new Microsoft.UI.Xaml.Thickness(0, 10, 0, 0)
+            };
+
+            // アプリ名
+            var appNameText = new Microsoft.UI.Xaml.Controls.TextBlock
+            {
+                Text = VersionInfo.GetAppName(),
+                FontSize = 20,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center
+            };
+            stackPanel.Children.Add(appNameText);
+
+            // バージョン
+            var versionText = new Microsoft.UI.Xaml.Controls.TextBlock
+            {
+                Text = $"バージョン {VersionInfo.GetVersion()}",
+                FontSize = 14,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center
+            };
+            stackPanel.Children.Add(versionText);
+
+            // Copyright
+            var copyrightText = new Microsoft.UI.Xaml.Controls.TextBlock
+            {
+                Text = VersionInfo.GetCopyright(),
+                FontSize = 12,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center,
+                Margin = new Microsoft.UI.Xaml.Thickness(0, 10, 0, 0)
+            };
+            stackPanel.Children.Add(copyrightText);
+
+            // GitHubリンク（アイコン表示）
+            // GitHubアイコンを画像として表示
+            Microsoft.UI.Xaml.UIElement githubContent;
+            
+            try
+            {
+                var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "github-mark.png");
+                if (File.Exists(iconPath))
+                {
+                    var storageFile = await StorageFile.GetFileFromPathAsync(iconPath);
+                    var stream = await storageFile.OpenAsync(Windows.Storage.FileAccessMode.Read);
+                    var bitmapImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                    await bitmapImage.SetSourceAsync(stream);
+                    
+                    var githubImage = new Microsoft.UI.Xaml.Controls.Image
+                    {
+                        Source = bitmapImage,
+                        Width = 32,
+                        Height = 32,
+                        HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center,
+                        VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Center,
+                        Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+                        Margin = new Microsoft.UI.Xaml.Thickness(0, 10, 0, 0)
+                    };
+                    githubContent = githubImage;
+                }
+                else
+                {
+                    // 画像が見つからない場合は、FontIconで代替表示
+                    githubContent = new Microsoft.UI.Xaml.Controls.FontIcon
+                    {
+                        Glyph = "\uE71B", // リンクアイコン
+                        FontSize = 32,
+                        FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets")
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning($"GitHubアイコンの読み込みエラー: {ex.Message}");
+                // エラー時は代替アイコン
+                githubContent = new Microsoft.UI.Xaml.Controls.FontIcon
+                {
+                    Glyph = "\uE71B", // リンクアイコン
+                    FontSize = 32,
+                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets")
+                };
+            }
+            
+            var githubButton = new Microsoft.UI.Xaml.Controls.Button
+            {
+                Content = githubContent,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center,
+                Margin = new Microsoft.UI.Xaml.Thickness(0, 10, 0, 0),
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderThickness = new Microsoft.UI.Xaml.Thickness(0)
+            };
+            Microsoft.UI.Xaml.Controls.ToolTipService.SetToolTip(githubButton, "GitHub リポジトリを開く");
+            githubButton.Click += (s, e) =>
+            {
+                var uri = new Uri(VersionInfo.GetGitHubUrl());
+                _ = Launcher.LaunchUriAsync(uri);
+            };
+            stackPanel.Children.Add(githubButton);
+
+            return stackPanel;
         }
 
         /// <summary>
@@ -362,7 +649,7 @@ namespace OverlayTranslator
                         string finalText;
 
                         // 設定に応じてOCR処理を切り替え
-                        if (_settings.UseCombinedOCRTranslation)
+                        if (_settings?.UseCombinedOCRTranslation ?? true)
                         {
                             // OCR+翻訳処理（同時実行モード）
                             Logger.Info("OCR+翻訳処理を開始します（同時実行モード）");
@@ -541,6 +828,43 @@ namespace OverlayTranslator
             catch (Exception ex)
             {
                 Logger.Error("メインウィンドウのアイコン設定エラー", ex);
+            }
+        }
+
+        /// <summary>
+        /// バージョン情報ウィンドウのアイコンを設定
+        /// </summary>
+        private async Task SetAboutWindowIcon(Window window)
+        {
+            try
+            {
+                // icon.icoファイルのパスを取得
+                string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
+                
+                // ファイルが存在しない場合は、実行ファイルと同じディレクトリを試す
+                if (!File.Exists(iconPath))
+                {
+                    iconPath = Path.Combine(AppContext.BaseDirectory, "icon.ico");
+                }
+                
+                if (File.Exists(iconPath))
+                {
+                    // ファイルからStorageFileを作成
+                    var storageFile = await StorageFile.GetFileFromPathAsync(iconPath);
+                    
+                    // AppWindowにアイコンを設定
+                    window.AppWindow.SetIcon(storageFile.Path);
+                    
+                    Logger.Info($"バージョン情報ウィンドウのアイコンを設定しました: {iconPath}");
+                }
+                else
+                {
+                    Logger.Warning($"アイコンファイルが見つかりません: {iconPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("バージョン情報ウィンドウのアイコン設定エラー", ex);
             }
         }
     }
