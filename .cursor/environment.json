@@ -1,11 +1,5 @@
 {
   "name": "Overlay Translator",
   "install": "bash .cursor/install.sh",
-  "terminals": [
-    {
-      "name": "xvfb",
-      "command": "bash .cursor/xvfb.sh",
-      "description": "Virtual X display :99 for the Tkinter overlay, pystray tray, and mss screen capture. Prefix GUI commands with DISPLAY=:99."
-    }
-  ]
+  "start": "bash .cursor/start.sh"
 }
