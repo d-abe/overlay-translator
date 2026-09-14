@@ -32,4 +32,13 @@ pip install --index-url https://download.pytorch.org/whl/cpu \
 echo "==> Installing project dependencies (requirements-dev.txt)"
 pip install -r requirements-dev.txt
 
+# Pre-cache EasyOCR models (en + ja) so the offline OCR path works out of the
+# box. Best-effort: a transient download failure must not fail the install.
+echo "==> Pre-caching EasyOCR models (en, ja)"
+python - <<'PY' || echo "WARN: EasyOCR model pre-cache skipped (will download on first use)"
+import easyocr
+easyocr.Reader(['en', 'ja'], gpu=False)
+print("EasyOCR models ready")
+PY
+
 echo "==> Install complete"
